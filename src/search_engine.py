@@ -1,27 +1,31 @@
-from googlesearch import search
 from groq import Groq
 from json import load, dump
+import requests
 import datetime
 import streamlit as st
 import os
 import re
 
-# ✅ Load all config from Streamlit Secrets
+# ✅ Load configuration from Streamlit Secrets only
 Username = st.secrets.get("USERNAME", "User")
 Assistantname = st.secrets.get("ASSISTANTNAME", "Sports Assistant")
 GroqAPIKey = st.secrets.get("GROQ_API_KEY")
+NewsAPIKey = st.secrets.get("NEWS_API_KEY")
 
 # ✅ Initialize Groq client
 client = Groq(api_key=GroqAPIKey) if GroqAPIKey else None
 
+
+# ---------- Utility Functions ----------
 def _ensure_chatlog_path() -> str:
-    """Return absolute path to chat log and ensure directory exists."""
+    """Ensure Data directory exists and return ChatLog path."""
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     data_dir = os.path.join(project_root, "Data")
     os.makedirs(data_dir, exist_ok=True)
     return os.path.join(data_dir, "ChatLog.json")
 
-# System prompt for sports focus
+
+# ---------- System Prompt ----------
 System = f"""Hello, I am {Username}. You are an advanced AI Sports Assistant named {Assistantname}, 
 which provides real-time, up-to-date information about sports from the internet.
 
@@ -36,61 +40,79 @@ Your expertise includes:
 *** Provide answers in a professional manner with correct grammar, punctuation, and clarity. ***
 *** Format all answers as concise bullet points. Use short sentences, each starting with "- ". ***
 *** Focus on providing accurate sports-related information based on the provided data. ***
-*** If a query is not sports-related, politely redirect the user to ask sports-related questions. ***"""
+*** If a query is not sports-related, politely redirect the user to ask sports-related questions. ***
+"""
 
+
+# ---------- Live News via NewsAPI ----------
 def GoogleSearch(query: str) -> str:
-    """Perform a Google search with sports context and return a concise summary block."""
+    """Fetch live sports updates using NewsAPI."""
+    if not NewsAPIKey:
+        return "[start]\nNo NewsAPI key found. Please add NEWS_API_KEY to Streamlit secrets.\n[end]"
+
     try:
-        lowered = query.lower()
-        site_bias = (
-            " site:uefa.com OR site:laliga.com OR site:fifa.com OR site:premierleague.com"
-            " OR site:espn.com OR site:bbc.com OR site:skysports.com"
-            " OR site:flashscore.com OR site:sofascore.com OR site:realmadrid.com"
-            " OR site:espncricinfo.com OR site:cricbuzz.com OR site:icc-cricket.com"
+        url = (
+            "https://newsapi.org/v2/everything?"
+            f"q={query}+sports&"
+            "language=en&"
+            "sortBy=publishedAt&"
+            "pageSize=5&"
+            f"apiKey={NewsAPIKey}"
         )
-        if "real madrid" in lowered:
-            site_bias += " OR site:realmadrid.com"
-        if any(k in lowered for k in ["fixture", "match", "schedule", "next", "upcoming", "game"]):
-            sports_query = f"{query} fixtures date time{site_bias}"
-        elif any(k in lowered for k in ["last", "previous", "result", "score", "final score", "won", "lost"]):
-            sports_query = f"{query} result score date{site_bias}"
-        else:
-            sports_query = f"{query} sports news stats results"
+        response = requests.get(url)
+        data = response.json()
 
-        results = list(search(sports_query, advanced=True, num_results=8))
-        Answer = f"The sports-related search results for '{query}' are:\n[start]\n"
-        for result in results:
-            url = getattr(result, "url", "")
-            Answer += (
-                f"Title: {getattr(result, 'title', '')}\n"
-                f"Description: {getattr(result, 'description', '')}\n"
-                f"URL: {url}\n\n"
-            )
-        Answer += "[end]"
-        return Answer
-    except Exception:
-        return "[start]\nNo live search results available at the moment.\n[end]"
+        if response.status_code != 200 or "articles" not in data:
+            return f"[start]\nFailed to fetch live updates (HTTP {response.status_code}).\n[end]"
 
+        articles = data.get("articles", [])
+        if not articles:
+            return f"[start]\nNo recent updates found for '{query}'.\n[end]"
+
+        # Format NewsAPI response
+        answer = f"Here are the latest sports updates for '{query}':\n[start]\n"
+        for art in articles:
+            title = art.get("title", "No title available")
+            desc = art.get("description", "")
+            url = art.get("url", "")
+            published = art.get("publishedAt", "").replace("T", " ").replace("Z", "")
+            answer += f"Title: {title}\nDescription: {desc}\nPublished: {published}\nURL: {url}\n\n"
+        answer += "[end]"
+        return answer
+
+    except Exception as e:
+        return f"[start]\nError fetching live data: {e}\n[end]"
+
+
+# ---------- Text Formatting ----------
 def AnswerModifier(answer: str) -> str:
+    """Normalize or bulletize the model’s responses."""
     lines = [ln.strip() for ln in answer.split('\n') if ln.strip()]
     if not lines:
         return ""
+
     has_bullets = any(ln.lstrip().startswith(('- ', '* ', '• ')) for ln in lines)
     if has_bullets:
         normalized = [('- ' + ln.lstrip()[2:].strip()) if ln.lstrip().startswith(('* ', '• ')) else ln for ln in lines]
         return '\n'.join(normalized)
+
     text = ' '.join(lines)
     sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
     bullets = [f"- {s.rstrip('.')}" for s in sentences]
     return '\n'.join(bullets)
 
+
+# ---------- Optional Score Extractor ----------
 def _extract_cricket_score(summary_block: str) -> str | None:
+    """Extract quick cricket scores from summaries."""
     block = summary_block.lower()
     if not any(k in block for k in ["india", "ind", "west indies", "wi", "runs", "wickets", "/"]):
         return None
+
     m = re.search(r"(india|ind)[^\n]*\b(\d+(/\d+)?)([^\n]*)", block)
     n = re.search(r"(west\s*indies|\bwi\b)[^\n]*\b(\d+(/\d+)?)([^\n]*)", block)
     r = re.search(r"(won by|beat|defeated|draw|tie|tied)[^\n]*", block)
+
     parts = []
     if m:
         parts.append(f"- India: {m.group(2)}")
@@ -98,9 +120,13 @@ def _extract_cricket_score(summary_block: str) -> str | None:
         parts.append(f"- West Indies: {n.group(2)}")
     if r:
         parts.append(f"- Result: {r.group(0).capitalize()}")
+
     return '\n'.join(parts) if parts else None
 
+
+# ---------- Date / Time Info ----------
 def Information() -> str:
+    """Generate dynamic date and time for context."""
     current_date_time = datetime.datetime.now()
     return (
         f"Current information for sports updates:\n"
@@ -108,11 +134,11 @@ def Information() -> str:
         f"Date: {current_date_time.strftime('%d')}\n"
         f"Month: {current_date_time.strftime('%B')}\n"
         f"Year: {current_date_time.strftime('%Y')}\n"
-        f"Time: {current_date_time.strftime('%H')} hours, "
-        f"{current_date_time.strftime('%M')} minutes, "
-        f"{current_date_time.strftime('%S')} seconds.\n"
+        f"Time: {current_date_time.strftime('%H:%M:%S')}.\n"
     )
 
+
+# ---------- Main Chat Engine ----------
 def RealTimeSearchEngine(
     prompt: str,
     *,
@@ -121,13 +147,14 @@ def RealTimeSearchEngine(
     max_tokens: int = 512,
     top_p: float = 0.9
 ) -> str:
+    """Main chat logic combining Groq + live search data."""
     try:
         lowered = prompt.lower().strip()
         if lowered in ['hi', 'hello', 'hey'] or any(lowered.startswith(g) for g in ['hi ', 'hello ', 'hey ']):
             return "Hello! I'm your Sports Assistant. How can I help you with sports-related information today?"
 
         if client is None:
-            return "I'm ready to chat about sports, but a valid Groq API key is missing. Please add it to Streamlit secrets."
+            return "⚠️ Missing Groq API key. Please add GROQ_API_KEY in Streamlit secrets."
 
         chat_log_path = _ensure_chatlog_path()
         if not os.path.exists(chat_log_path):
@@ -140,41 +167,23 @@ def RealTimeSearchEngine(
         except:
             messages = []
 
-        event_keywords = re.compile(r"\b(score|result|won|lost|beat|defeated|draw|tie|fixture|match)\b", re.I)
-        if event_keywords.search(prompt):
-            try:
-                search_block = GoogleSearch(prompt)
-                cricket = _extract_cricket_score(search_block)
-                if cricket:
-                    return AnswerModifier(cricket)
-            except Exception:
-                pass
+        # Add live search enrichment
+        event_keywords = re.compile(r"\b(score|result|won|lost|beat|defeated|draw|tie|fixture|match|news|update)\b", re.I)
+        conversation = [{"role": "system", "content": System}, {"role": "user", "content": prompt}]
 
-        conversation = [
-            {"role": "system", "content": System},
-            {"role": "user", "content": prompt}
-        ]
-
-        import re as _re
-        asks_events = bool(_re.search(r"\b(next|upcoming|match|fixture|schedule|game|last|previous|result|score)\b", prompt, _re.I))
-        if asks_events or len(prompt.split()) > 3:
+        if event_keywords.search(prompt) or len(prompt.split()) > 3:
             try:
                 search_result = GoogleSearch(prompt)
                 conversation.append({"role": "system", "content": search_result})
-            except:
+            except Exception:
                 pass
 
         conversation.append({"role": "system", "content": Information()})
 
-        candidate_models = [
-            m for m in [
-                model,
-                "llama-3.1-8b-instant",
-                "mixtral-8x7b-32768",
-            ] if m
-        ]
-        last_error: str | None = None
-        response: str | None = None
+        # Try multiple models in fallback order
+        candidate_models = [m for m in [model, "llama-3.1-8b-instant", "mixtral-8x7b-32768"] if m]
+        response, last_error = None, None
+
         for candidate in candidate_models:
             try:
                 completion = client.chat.completions.create(
@@ -187,21 +196,21 @@ def RealTimeSearchEngine(
                 response = completion.choices[0].message.content
                 break
             except Exception as e:
-                err_text = str(e)
-                last_error = err_text
-                if "model_decommissioned" in err_text or "invalid_request_error" in err_text:
-                    continue
+                last_error = str(e)
                 continue
 
         if response is None:
-            raise Exception(last_error or "Model error")
+            raise Exception(last_error or "No response generated from Groq API.")
 
         response = response.strip().replace("</s", "")
         messages.append({"role": "user", "content": prompt})
         formatted = AnswerModifier(response)
         messages.append({"role": "assistant", "content": formatted})
+
+        # Limit chat history
         messages = messages[-20:] if len(messages) > 20 else messages
 
+        # Save chat log
         try:
             with open(chat_log_path, "w") as f:
                 dump(messages, f, indent=4)
