@@ -6,14 +6,14 @@ from dotenv import dotenv_values
 import os
 import re
 
-# Load environment variables
-env_vars = dotenv_values(os.path.join(os.path.dirname(__file__), "..", ".env"))
+GroqAPIKey = os.getenv("GROQ_API_KEY")
 
-Username = env_vars.get("Username", "User")
-Assistantname = env_vars.get("Assistantname", "Sports Assistant")
-GroqAPIKey = env_vars.get("GroqAPIKey", "")
+# Fallback to .env file for local dev
+if not GroqAPIKey:
+    env_vars = dotenv_values(os.path.join(os.path.dirname(__file__), "..", ".env"))
+    GroqAPIKey = env_vars.get("GroqAPIKey", "")
 
-# Initialize Groq client
+# Initialize Groq client if key available
 client = Groq(api_key=GroqAPIKey) if GroqAPIKey else None
 
 def _ensure_chatlog_path() -> str:
