@@ -5,6 +5,7 @@ protobuf==4.25.3
 beautifulsoup4==4.12.3
 python-dotenv==1.0.1
 reportlab==3.6.13
-scikit-learn==1.5.2google-api-python-client
+scikit-learn==1.5.2
+google-api-python-client
 google-auth
 google-auth-oauthlib
