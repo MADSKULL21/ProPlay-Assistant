@@ -1,0 +1,64 @@
+Metadata-Version: 2.4
+Name: grpc-stubs
+Version: 1.53.0.6
+Summary: Mypy stubs for gRPC
+Home-page: https://github.com/shabbyrobe/grpc-stubs
+Author: Blake Williams
+Author-email: code@shabbyrobe.org
+License: MIT
+Classifier: Development Status :: 3 - Alpha
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Requires-Python: >=3.6
+Description-Content-Type: text/x-rst
+License-File: LICENSE
+Requires-Dist: grpcio
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+gRPC Typing Stubs for Python
+============================
+
+> [!WARNING]
+>
+> **2025-04-28: The end of the line for `grpc-stubs`**.
+>
+> My involvement with grpc ceased around 2019, and my knowledge of the minutiae faded
+> with each passing year. As a consequence, this this project has been archived, but
+> development will continue at
+> [typeshed](https://github.com/python/typeshed/tree/main/stubs/grpcio). Thank you to
+> the folks who helped [prepare the code for
+> merging](https://github.com/python/typeshed/pull/11204).
+
+This is a PEP-561-compliant stub-only package which provides type information of
+[gRPC](https://grpc.io>).
+
+Install using pip:
+
+    pip install grpc-stubs
+
+Tests (courtesy of [pytest-mypy-plugins](https://github.com/typeddjango/pytest-mypy-plugins>):
+
+    pip install -r requirements-dev.txt
+    ./tools.sh test
+
+
+## Python Support
+
+grpc-stubs is tested with 3.7 or later, but ideally it should support Python 3.6 as
+grpc still supports this. Python 3.6 had to be disabled in the tests due to
+various cascading fiascos and a lack of time to contend with them. Feel free
+to submit a PR if you'd like to see it returned, or open issues. Ensure that
+you supply an MRE as per the contributing guidelines below.
+
