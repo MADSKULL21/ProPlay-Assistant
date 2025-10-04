@@ -1,85 +1,128 @@
-# ProPlay Assistant ChatBot
+# 🏆 ProPlay Assistant ChatBot
 
-A Streamlit-based AI chatbot that helps users with sports-related queries, providing real-time information and assistance about various sports, teams, players, and events.
+**ProPlay Assistant** is a **Streamlit-based AI chatbot** that helps users with sports-related queries — offering **real-time updates, player stats, team information**, and more, all powered by **Groq AI** for lightning-fast, accurate responses.
 
-## Features
+---
 
-- Real-time sports information and updates
-- Interactive chat interface using Streamlit
-- Powered by Groq AI for accurate responses
-- Multiple AI model options (llama-3.1-70b, llama-3.1-8b, mixtral-8x7b)
-- Fast and Accurate operation modes
-- Google search integration for up-to-date information
-- Chat session management with save/load capability
-- Chat summarization with PDF export
-- Support for various sports topics and queries
-- Beautiful, responsive UI with dark theme
+## 🚀 Features
 
-## Installation
+- ⚡ **Real-time sports information and updates**  
+- 💬 **Interactive chat interface** built with Streamlit  
+- 🧠 **Powered by Groq AI** for accurate and fast responses  
+- 🔁 **Multiple AI model options** via Groq API:  
+  - **LLaMA 3.1 - 70B** (high accuracy)  
+  - **LLaMA 3.1 - 8B** (lightweight and fast)  
+  - **Mixtral 8x7B** (balanced performance)  
+- 🧩 **Fast** and **Accurate** operation modes  
+- 🔍 **Google search integration** for up-to-date insights  
+- 💾 **Chat session management** — save, load, and rename chats  
+- 📝 **Chat summarization** with PDF export  
+- 🎯 **Wide sports coverage** — teams, players, schedules, and more  
+- 🌙 **Beautiful, responsive dark-themed UI**
 
-1. Clone the repository:
+---
+
+## 🎮 Live Demo
+
+Try the live Streamlit app here:  
+👉 [**ProPlay Assistant on Streamlit**](https://proplay-assistant-sml21.streamlit.app/)
+
+---
+
+## ⚙️ Installation
+
+### 1. Clone the repository
 ```bash
 git clone https://github.com/MADSKULL21/ProPlay-Assistant.git
-cd ProPlay-Assistant-chatbot
+cd ProPlay-Assistant
 ```
 
-2. Install dependencies:
+### 2. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Create a `.env` file in the root directory with the following variables:
+### 3. Set up environment variables
+Create a `.env` file in the root directory and add:
 ```env
-GroqAPIKey=your_groq_api_key
-Username=your_preferred_username
-Assistantname=Sports Assistant
+GROQ_API_KEY=your_groq_api_key
+USERNAME=your_preferred_username
+ASSISTANT_NAME=Sports Assistant
 ```
 
-4. Run the application:
+### 4. Run the application
 ```bash
 streamlit run src/app.py
 ```
 
-### Optional CLI utilities
+---
 
-- `ChatBot.py`: simple console chatbot that logs to `Data/ChatLog.json`.
-- `RealtimeSearchEngine.py`: console tool that enriches prompts with Google search snippets.
+## 💡 Optional CLI Utilities
 
-## Usage
+- **ChatBot.py** – Simple console chatbot that logs interactions to `Data/ChatLog.json`.  
+- **RealtimeSearchEngine.py** – Command-line tool that enhances prompts using Google Search snippets.
 
-1. Launch the application using Streamlit
-2. Use the sidebar to select model and creativity, and to clear chat
-3. Enter your sports-related question in the chat input
-4. Get real-time responses about:
-   - Latest sports news and updates
-   - Player statistics and information
-   - Team performance and rankings
-   - Tournament schedules and results
-   - Sports rules and regulations
+---
+
+## 🧠 Usage
+
+1. Launch the app using Streamlit.  
+2. Use the **sidebar** to:
+   - Select an AI model and creativity level (temperature).  
+   - Switch between **Fast** and **Accurate** modes.  
+   - Clear or rename chat sessions.  
+3. Type your **sports-related question** in the input box.  
+4. Get real-time insights on:
+   - 📰 Latest sports news and events  
+   - 🧍 Player stats and biographies  
+   - 🏟️ Team rankings and performance  
+   - 🏆 Tournament results and schedules  
+   - 📜 Rules, formats, and historical data  
 5. Additional features:
-   - Save and manage multiple chat sessions
-   - Rename chat sessions for better organization
-   - Generate and download chat summaries as PDFs
-   - Switch between Fast and Accurate modes
-   - Adjust AI model creativity with temperature control
+   - Save, rename, and load chat sessions.  
+   - Generate chat summaries and **export them as PDFs**.  
+   - Responsive, user-friendly dark theme.
 
-## Project Structure
+---
+
+## 📁 Project Structure
 
 ```
 ├── src/
-│   ├── app.py              # Streamlit UI (chat, sidebar, styling)
+│   ├── app.py              # Streamlit app (UI, chat logic, sidebar)
 │   ├── search_engine.py    # Groq + Google search integration
-│   └── __pycache__/        # Python bytecode cache
+│   └── __pycache__/        # Python cache
 ├── Data/
 │   ├── ChatLog.json        # Chat history storage
-│   ├── Sessions/           # Individual chat session storage
-│   │   └── index.json      # Sessions index file
-│   └── Summaries/          # Chat summary storage
-├── requirements.txt        # Project dependencies
-├── README.md              # Project documentation
-└── .env                   # Environment variables
+│   ├── Sessions/           # Individual chat sessions
+│   │   └── index.json      # Session index file
+│   └── Summaries/          # Chat summaries (PDF/text)
+├── requirements.txt         # Dependencies
+├── README.md                # Project documentation
+└── .env                     # Environment variables
 ```
 
-## Contributing
+---
 
-Feel free to submit issues and enhancement requests!
+## 🧩 Version
+**v1.0.0** — Initial release with Groq API integration, Google search support, and Streamlit chat UI.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome!  
+- Fork the repo  
+- Create your feature branch (`git checkout -b feature-name`)  
+- Commit your changes  
+- Submit a Pull Request 🎉  
+
+---
+
+## 📜 License
+
+This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
+
+---
+
+**Developed with ❤️ using Streamlit & Groq AI**
