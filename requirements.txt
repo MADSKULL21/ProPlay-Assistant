@@ -7,3 +7,4 @@ googlesearch-python==1.2.3
 reportlab==4.2.5
 scikit-learn==1.5.2
 numpy
+groq==0.4.2
