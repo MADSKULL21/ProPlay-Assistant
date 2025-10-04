@@ -1,30 +1,26 @@
-from googlesearch import search
-from groq import Groq
-from json import load, dump
-import datetime
-from dotenv import dotenv_values
 import os
+import datetime
 import re
+from dotenv import dotenv_values
+from groq import Groq
 
+# --- Load Config (Secrets first, .env fallback) ---
+Username = os.getenv("USERNAME")
+Assistantname = os.getenv("ASSISTANTNAME")
 GroqAPIKey = os.getenv("GROQ_API_KEY")
 
-# Fallback to .env file for local dev
-if not GroqAPIKey:
+if not (Username and Assistantname and GroqAPIKey):
     env_vars = dotenv_values(os.path.join(os.path.dirname(__file__), "..", ".env"))
-    GroqAPIKey = env_vars.get("GroqAPIKey", "")
+    Username = Username or env_vars.get("Username", "User")
+    Assistantname = Assistantname or env_vars.get("Assistantname", "Sports Assistant")
+    GroqAPIKey = GroqAPIKey or env_vars.get("GroqAPIKey", "")
 
-# Initialize Groq client if key available
+# Initialize Groq client
 client = Groq(api_key=GroqAPIKey) if GroqAPIKey else None
 
-def _ensure_chatlog_path() -> str:
-    """Return absolute path to chat log and ensure directory exists."""
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    data_dir = os.path.join(project_root, "Data")
-    os.makedirs(data_dir, exist_ok=True)
-    return os.path.join(data_dir, "ChatLog.json")
-
-# System prompt for sports focus
-System = f"""Hello, I am {Username}. You are an advanced AI Sports Assistant named {Assistantname}, 
+# --- System Prompt ---
+System = f"""
+Hello, I am {Username}. You are an advanced AI Sports Assistant named {Assistantname}, 
 which provides real-time, up-to-date information about sports from the internet.
 
 Your expertise includes:
@@ -38,7 +34,8 @@ Your expertise includes:
 *** Provide answers in a professional manner with correct grammar, punctuation, and clarity. ***
 *** Format all answers as concise bullet points. Use short sentences, each starting with "- ". ***
 *** Focus on providing accurate sports-related information based on the provided data. ***
-*** If a query is not sports-related, politely redirect the user to ask sports-related questions. ***"""
+*** If a query is not sports-related, politely redirect the user to ask sports-related questions. ***
+"""
 
 def GoogleSearch(query: str) -> str:
     """Perform a Google search with sports context and return a concise summary block.
