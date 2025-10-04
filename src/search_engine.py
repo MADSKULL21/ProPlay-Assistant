@@ -1,8 +1,10 @@
 import os
 import datetime
 import re
+import json
 from dotenv import dotenv_values
 from groq import Groq
+from duckduckgo_search import DDGS
 
 # --- Load Config (Secrets first, .env fallback) ---
 Username = os.getenv("USERNAME")
@@ -37,11 +39,20 @@ Your expertise includes:
 *** If a query is not sports-related, politely redirect the user to ask sports-related questions. ***
 """
 
-def GoogleSearch(query: str) -> str:
-    """Perform a Google search with sports context and return a concise summary block.
+# --- FIX: Helper to ensure chatlog path exists ---
+def _ensure_chatlog_path() -> str:
+    """Ensure the chatlog file exists and return its path."""
+    base_dir = os.path.join(os.path.dirname(__file__), "..", "data")
+    os.makedirs(base_dir, exist_ok=True)
+    chat_log_path = os.path.join(base_dir, "chat_log.json")
+    if not os.path.exists(chat_log_path):
+        with open(chat_log_path, "w") as f:
+            json.dump([], f)
+    return chat_log_path
 
-    Includes title, description, and URL when available.
-    """
+
+def GoogleSearch(query: str) -> str:
+    """Perform a Google search with sports context and return a concise summary block."""
     try:
         # Prefer authoritative sports sources when user asks about events
         lowered = query.lower()
@@ -59,19 +70,22 @@ def GoogleSearch(query: str) -> str:
             sports_query = f"{query} result score date{site_bias}"
         else:
             sports_query = f"{query} sports news stats results"
-        results = list(search(sports_query, advanced=True, num_results=8))
+
+        # Use DuckDuckGo search for results
+        results = list(DDGS().text(sports_query, max_results=8))
         Answer = f"The sports-related search results for '{query}' are:\n[start]\n"
         for result in results:
-            url = getattr(result, "url", "")
+            url = result.get("href", "")
             Answer += (
-                f"Title: {getattr(result, 'title', '')}\n"
-                f"Description: {getattr(result, 'description', '')}\n"
+                f"Title: {result.get('title', '')}\n"
+                f"Description: {result.get('body', '')}\n"
                 f"URL: {url}\n\n"
             )
         Answer += "[end]"
         return Answer
     except Exception:
         return "[start]\nNo live search results available at the moment.\n[end]"
+
 
 def AnswerModifier(answer: str) -> str:
     lines = [ln.strip() for ln in answer.split('\n') if ln.strip()]
@@ -83,22 +97,18 @@ def AnswerModifier(answer: str) -> str:
         normalized = [('- ' + ln.lstrip()[2:].strip()) if ln.lstrip().startswith(('* ', '• ')) else ln for ln in lines]
         return '\n'.join(normalized)
     # Otherwise, split into sentences and bulletize
-    import re
     text = ' '.join(lines)
     sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
     bullets = [f"- {s.rstrip('.')}" for s in sentences]
     return '\n'.join(bullets)
 
+
 def _extract_cricket_score(summary_block: str) -> str | None:
-    # Look for patterns like IND 245/7, India 245 & 123, won by 5 wickets, etc.
     block = summary_block.lower()
-    # Quick signals
     if not any(k in block for k in ["india", "ind", "west indies", "wi", "runs", "wickets", "/"]):
         return None
-    # Try to find concise outcome lines
     m = re.search(r"(india|ind)[^\n]*\b(\d+(/\d+)?)([^\n]*)", block)
     n = re.search(r"(west\s*indies|\bwi\b)[^\n]*\b(\d+(/\d+)?)([^\n]*)", block)
-    # Result phrase
     r = re.search(r"(won by|beat|defeated|draw|tie|tied)[^\n]*", block)
     parts = []
     if m:
@@ -108,6 +118,7 @@ def _extract_cricket_score(summary_block: str) -> str | None:
     if r:
         parts.append(f"- Result: {r.group(0).capitalize()}")
     return '\n'.join(parts) if parts else None
+
 
 def Information() -> str:
     current_date_time = datetime.datetime.now()
@@ -122,6 +133,7 @@ def Information() -> str:
         f"{current_date_time.strftime('%S')} seconds.\n"
     )
 
+
 def RealTimeSearchEngine(
     prompt: str,
     *,
@@ -131,31 +143,26 @@ def RealTimeSearchEngine(
     top_p: float = 0.9
 ) -> str:
     try:
-        # Handle basic greetings
         lowered = prompt.lower().strip()
         if lowered in ['hi', 'hello', 'hey'] or any(lowered.startswith(g) for g in ['hi ', 'hello ', 'hey ']):
             return "Hello! I'm your Sports Assistant. How can I help you with sports-related information today?"
 
-        # Check if client is initialized (after greeting so we can always respond to greetings)
         if client is None:
             return (
                 "I'm ready to chat about sports, but I need an API key to fetch live answers. "
                 "Please set GroqAPIKey in your .env and restart the app."
             )
 
-        # Load chat history
+        # FIX: ensure chat log path
         chat_log_path = _ensure_chatlog_path()
-        if not os.path.exists(chat_log_path):
-            with open(chat_log_path, "w") as f:
-                dump([], f)
 
         try:
             with open(chat_log_path, "r") as f:
-                messages = load(f)
+                messages = json.load(f)
         except:
             messages = []
 
-        # Shortcut: for event score queries, try extracting directly from search
+        # Shortcut: direct cricket score extraction
         event_keywords = re.compile(r"\b(score|result|won|lost|beat|defeated|draw|tie|fixture|match)\b", re.I)
         if event_keywords.search(prompt):
             try:
@@ -172,21 +179,17 @@ def RealTimeSearchEngine(
             {"role": "user", "content": prompt}
         ]
 
-        # Add search results for longer queries only (reduces latency)
-        # Always enrich if the user asks about match timing/fixtures; otherwise, enrich longer queries only
-        import re as _re
-        asks_events = bool(_re.search(r"\b(next|upcoming|match|fixture|schedule|game|last|previous|result|score)\b", prompt, _re.I))
+        # Add search results for event-related queries
+        asks_events = bool(re.search(r"\b(next|upcoming|match|fixture|schedule|game|last|previous|result|score)\b", prompt, re.I))
         if asks_events or len(prompt.split()) > 3:
             try:
                 search_result = GoogleSearch(prompt)
                 conversation.append({"role": "system", "content": search_result})
             except:
-                pass  # Continue without search results if search fails
+                pass
 
-        # Add current time information
         conversation.append({"role": "system", "content": Information()})
 
-        # Choose models (backend will try fallbacks to avoid decommission errors)
         candidate_models = [
             m for m in [
                 model,
@@ -207,34 +210,29 @@ def RealTimeSearchEngine(
                 )
                 response = completion.choices[0].message.content
                 break
-            except Exception as e:  # Fallback on decommission or invalid model
+            except Exception as e:
                 err_text = str(e)
                 last_error = err_text
                 if "model_decommissioned" in err_text or "decommissioned" in err_text or "invalid_request_error" in err_text:
                     continue
-                # If it's another transient error, continue to next; otherwise keep last_error
                 continue
         if response is None:
             raise Exception(last_error or "Model error")
 
-        # Clean up the response
         response = response.strip().replace("</s", "")
-        
-        # Update chat history
+
         messages.append({"role": "user", "content": prompt})
         formatted = AnswerModifier(response)
         messages.append({"role": "assistant", "content": formatted})
-        
-        # Keep only recent messages (last 10 exchanges)
+
         messages = messages[-20:] if len(messages) > 20 else messages
-        
-        # Save chat history
+
         try:
             with open(chat_log_path, "w") as f:
-                dump(messages, f, indent=4)
+                json.dump(messages, f, indent=4)
         except Exception:
-            pass  # Continue if saving fails
-        
+            pass
+
         return formatted
 
     except Exception as e:
